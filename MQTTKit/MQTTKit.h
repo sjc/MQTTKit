@@ -61,6 +61,9 @@ typedef void (^MQTTDisconnectionHandler)(NSUInteger code);
 @property (nonatomic, copy) MQTTMessageHandler messageHandler;
 @property (nonatomic, copy) MQTTDisconnectionHandler disconnectionHandler;
 
+// if set to YES, when a connection is opened the underlying socket is configured for VoIP use
+@property (nonatomic) BOOL VoIP;
+
 + (void) initialize;
 + (NSString*) version;
 

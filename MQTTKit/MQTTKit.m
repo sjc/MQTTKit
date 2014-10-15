@@ -70,6 +70,10 @@
 // dispatch queue to run the mosquitto_loop_forever.
 @property (nonatomic, strong) dispatch_queue_t queue;
 
+@property (nonatomic,assign) CFReadStreamRef input;
+
+- (void)_closeInputStream;
+
 @end
 
 @implementation MQTTClient
@@ -82,7 +86,15 @@ static void on_connect(struct mosquitto *mosq, void *obj, int rc)
 {
     MQTTClient* client = (__bridge MQTTClient*)obj;
     LogDebug(@"[%@] on_connect rc = %d", client.clientID, rc);
-    client.connected = (rc == ConnectionAccepted);
+
+    if((client.connected = (rc == ConnectionAccepted)) && client.VoIP) {
+        CFStreamCreatePairWithSocket(NULL, mosquitto_socket(mosq), &(client->_input), NULL);
+        if(client.input) {
+            CFReadStreamSetProperty(client.input, kCFStreamNetworkServiceType, kCFStreamNetworkServiceTypeVoIP);
+            CFReadStreamOpen(client.input);
+        }
+    }
+
     if (client.connectionCompletionHandler) {
         client.connectionCompletionHandler(rc);
     }
@@ -97,6 +109,9 @@ static void on_disconnect(struct mosquitto *mosq, void *obj, int rc)
     [client.unsubscriptionHandlers removeAllObjects];
 
     client.connected = NO;
+
+    [client _closeInputStream];
+
     if (client.disconnectionHandler) {
         client.disconnectionHandler(rc);
     }
@@ -219,6 +234,15 @@ static void on_unsubscribe(struct mosquitto *mosq, void *obj, int message_id)
     if (mosq) {
         mosquitto_destroy(mosq);
         mosq = NULL;
+    }
+    [self _closeInputStream];
+}
+
+- (void)_closeInputStream {
+    if(_input) {
+        CFReadStreamClose(_input);
+        CFRelease(_input);
+        _input = NULL;
     }
 }
 
